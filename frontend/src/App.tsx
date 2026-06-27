@@ -7,11 +7,13 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
 
 function App() {
   const { count, increment, decrement, reset } = useCounterStore()
+  const title = "Zustand で状態管理されたカウンター";
+  const fruits = ["apple", "banana", "grape"];
 
   return (
     <div className="container">
       <h1>{appTitle}</h1>
-      <p className="hint">Zustand で状態管理されたカウンター</p>
+      <p className="hint">{title}</p>
       <div className="card">
         <p className="count">{count}</p>
         <div className="buttons">
@@ -20,6 +22,11 @@ function App() {
           <button onClick={increment}>+1</button>
         </div>
       </div>
+      <ul>
+          {fruits.map((fruit, index) => (
+              <li key={index}>{fruit}</li>
+          ))}
+      </ul>
       <p className="env">API Base URL: <code>{apiBaseUrl}</code></p>
     </div>
   )
