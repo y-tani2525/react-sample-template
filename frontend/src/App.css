@@ -1,0 +1,54 @@
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.hint {
+  opacity: 0.7;
+}
+
+.card {
+  padding: 2rem;
+}
+
+.count {
+  font-size: 4rem;
+  font-weight: bold;
+  margin: 0.5rem 0;
+}
+
+.buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  background-color: #2a2a2a;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+button:hover {
+  border-color: #646cff;
+}
+
+.env {
+  margin-top: 2rem;
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+
+.env code {
+  background-color: #2a2a2a;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+}

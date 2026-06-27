@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+*.log
+
+# 環境変数（秘匿情報を含むためコミットしない）
+.env
+.env.*
+!.env.example

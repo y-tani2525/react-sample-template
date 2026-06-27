@@ -1,0 +1,17 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      # ソースをマウントしてホットリロード
+      - ./frontend:/app
+      # node_modules はコンテナ内のものを使う（ホストで上書きしない）
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    # フォアグラウンド実行用
+    stdin_open: true
+    tty: true
