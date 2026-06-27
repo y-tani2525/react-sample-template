@@ -5,6 +5,13 @@ dist-ssr
 .DS_Store
 *.log
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/all-blob-reports/
+/playwright/.cache/
+
 # 環境変数（秘匿情報を含むためコミットしない）
 .env
 .env.*

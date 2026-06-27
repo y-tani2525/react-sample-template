@@ -1,0 +1,43 @@
+name: Frontend Lint
+
+"on":
+  pull_request_target:
+    paths:
+      - "frontend/**"
+
+# フロントエンドのコードは frontend/ 配下にあるため、run系は全て frontend/ で実行する
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      # NOTE: pull_request_targetでは既定でベースブランチがcheckoutされPRのコードが検証されないため、
+      # PRヘッドを明示的にcheckoutする
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      # NOTE: frontend/Dockerfile の node:26-slim に合わせる
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      # 参考: https://tech.findy.co.jp/entry/2024/09/17/090000
+      - name: node_modulesをキャッシュから取り出す
+        uses: actions/cache@v4
+        id: node_modules_cache
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.arch }}-${{ runner.os }}-node_modules-${{ hashFiles('frontend/yarn.lock') }}
+      - if: steps.node_modules_cache.outputs.cache-hit != 'true'
+        name: node_modulesのキャッシュがなかったので取りに行く
+        run: yarn install --frozen-lockfile
+
+      - name: 型チェック(tsc)
+        run: yarn tsc -b
+      - name: Lint(eslint)
+        run: yarn lint

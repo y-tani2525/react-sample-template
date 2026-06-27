@@ -12,8 +12,9 @@ Docker 上で動く React + Vite + Zustand + TypeScript の開発環境テンプ
 | 状態管理 | [Zustand](https://zustand.docs.pmnd.rs/) | 5 |
 | 言語 | [TypeScript](https://www.typescriptlang.org/) | 5.7 |
 | パッケージマネージャ | [Yarn](https://classic.yarnpkg.com/) (Classic) | 1.22 |
+| E2E テスト | [Playwright](https://playwright.dev/) | 1.61 |
 | 実行環境 | [Docker](https://www.docker.com/) / Docker Compose | - |
-| ベースイメージ | `node:22-slim` | - |
+| ベースイメージ | `node:26-slim` | - |
 
 ## 前提条件
 
@@ -28,14 +29,22 @@ Docker 上で動く React + Vite + Zustand + TypeScript の開発環境テンプ
 .
 ├── docker-compose.yml          # コンテナ起動・ボリュームマウント設定
 ├── README.md
+├── .github/
+│   └── workflows/
+│       ├── e2e-test-base.yml   # 再利用ワークフロー（セットアップ・シャーディング・レポート統合）
+│       └── e2e-test.yml        # PR トリガーの呼び出し側ワークフロー
 └── frontend/
-    ├── Dockerfile              # node:22-slim ベースの開発用イメージ
+    ├── Dockerfile              # node:26-slim ベースの開発用イメージ
     ├── .dockerignore
     ├── package.json            # 依存定義
     ├── yarn.lock               # ロックファイル
     ├── vite.config.ts          # host:true + usePolling（Docker 用 HMR 設定）
+    ├── playwright.config.ts    # Playwright（E2E）設定
     ├── tsconfig*.json
     ├── index.html
+    ├── tests/
+    │   └── playwright/
+    │       └── _template.spec.ts # E2E テストのテンプレート（コピーして使う）
     └── src/
         ├── main.tsx
         ├── App.tsx             # Zustand を使ったカウンター UI
@@ -95,6 +104,46 @@ docker compose exec frontend yarn remove axios
 ```bash
 docker compose exec frontend yarn build      # dist/ に出力
 docker compose exec frontend yarn preview    # ビルド結果をプレビュー
+```
+
+## E2E テスト（Playwright）
+
+E2E テストは [Playwright](https://playwright.dev/) で記述し、`frontend/tests/playwright/` 配下に置きます。
+テスト実行前に Playwright が自動で開発サーバ（`yarn dev` / port 5173）を起動します（`playwright.config.ts` の `webServer`）。
+
+### ローカルでの実行
+
+```bash
+# 初回のみ: ブラウザのバイナリを取得（chromium / firefox / webkit）
+docker compose exec frontend yarn playwright install --with-deps
+
+# 全テストを実行
+docker compose exec frontend yarn test:e2e
+
+# 特定ファイル / ブラウザだけ実行
+docker compose exec frontend yarn test:e2e tests/playwright/_template.spec.ts --project=chromium
+```
+
+> `_template.spec.ts` がテンプレートです。新しいテストはこれをコピーして作成してください。
+
+### CI（GitHub Actions）
+
+PR 作成時に `frontend/**` などへの変更があると、`.github/workflows/e2e-test.yml` が
+再利用ワークフロー `e2e-test-base.yml` を呼び出して E2E を実行します。
+
+- **シャーディング**: テストを 2 分割（matrix）して並列実行し、所要時間を短縮します
+- **キャッシュ**: `node_modules` と Playwright のブラウザバイナリをキャッシュします
+- **レポート統合**: 各シャードの blob レポートを 1 つの HTML レポートにまとめ、アーティファクトとして保存します
+
+別の spec を CI 対象に追加したい場合は、`e2e-test.yml` でジョブを追加し、`target_file` に
+（`tests/playwright/` からの相対）パスを渡します。
+
+```yaml
+jobs:
+  template:
+    uses: ./.github/workflows/e2e-test-base.yml
+    with:
+      target_file: "_template.spec.ts"
 ```
 
 ## Docker 特有の設定ポイント

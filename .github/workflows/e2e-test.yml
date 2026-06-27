@@ -1,0 +1,18 @@
+# PR ごとに E2E を実行する呼び出し側ワークフロー。
+# 実体（セットアップ・シャーディング・レポート統合）は e2e-test-base.yml にまとめている。
+name: e2e-test
+
+# NOTE: fork PR からも secrets を使えるようにするため pull_request_target を使う。
+# base.yml 側で PR ヘッドを明示的に checkout している点に注意。
+"on":
+  pull_request_target:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/e2e-test*.yml"
+
+jobs:
+  template:
+    uses: ./.github/workflows/e2e-test-base.yml
+    with:
+      target_file: "_template.spec.ts"

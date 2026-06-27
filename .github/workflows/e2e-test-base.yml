@@ -1,0 +1,111 @@
+# 参考: https://playwright.dev/docs/test-sharding
+
+name: e2e-test
+"on":
+  workflow_call:
+    inputs:
+      target_file:
+        required: true
+        type: string
+        description: "例) template.spec.ts"
+
+# フロントエンドのコードは frontend/ 配下にあるため、run系は全て frontend/ で実行する
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  e2e:
+    name: "${{ matrix.shardIndex }}/${{ matrix.shardTotal }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2]
+        shardTotal: [2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      # NOTE: frontend/Dockerfile の node:26-slim に合わせる
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: node_modulesをキャッシュから取り出す
+        uses: actions/cache@v4
+        id: node_modules_cache
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.arch }}-${{ runner.os }}-node_modules-${{ hashFiles('frontend/yarn.lock') }}
+      - if: steps.node_modules_cache.outputs.cache-hit != 'true'
+        name: node_modulesのキャッシュがなかったので取りに行く
+        run: yarn install --frozen-lockfile
+
+      - name: PlayWrightのバージョンを調べる
+        run: echo "PLAYWRIGHT_VERSION=$(node -p "require('@playwright/test/package.json').version")" >> $GITHUB_ENV
+      - name: PlayWright用ブラウザのバイナリをキャッシュから取り出す
+        uses: actions/cache@v4
+        id: playwright_browser_cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.arch }}-${{ runner.os }}-playwright-browser-${{ env.PLAYWRIGHT_VERSION }}
+      - if: steps.playwright_browser_cache.outputs.cache-hit != 'true'
+        name: PlayWright用ブラウザのキャッシュがなかったので取りに行く
+        run: yarn playwright install --with-deps
+      - run: yarn playwright install-deps webkit --dry-run
+      - if: steps.playwright_browser_cache.outputs.cache-hit == 'true'
+        name: webkitだけは毎回インストールする
+        run: yarn playwright install-deps webkit
+
+      - name: PlayWrightでテストを実行
+        run: yarn test:e2e tests/playwright/${{ inputs.target_file }} --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+
+      - name: PlayWrightのレポートをアップロード
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shardIndex }}
+          path: frontend/blob-report
+          retention-days: 1
+
+  merge-reports:
+    if: ${{ !cancelled() }}
+    needs: [e2e]
+    name: "レポートのまとめ"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: node_modulesをキャッシュから取り出す
+        uses: actions/cache@v4
+        id: node_modules_cache
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.arch }}-${{ runner.os }}-node_modules-${{ hashFiles('frontend/yarn.lock') }}
+      - if: steps.node_modules_cache.outputs.cache-hit != 'true'
+        name: node_modulesのキャッシュがなかったので取りに行く
+        run: yarn install --frozen-lockfile
+
+      - name: 各Matrixで出たレポートをダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          path: frontend/all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: 現状把握
+        run: ls -la all-blob-reports
+      - name: レポートを一つにまとめる
+        run: yarn playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: レポートをアップロードする
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-report--attempt-${{ github.run_attempt }}
+          path: frontend/playwright-report
+          retention-days: 14
